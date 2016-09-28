@@ -1,0 +1,131 @@
+{% extends "views/layouts/base.html" %}
+{% block yield %}
+<script src="{{ mavensmate.ui.getStaticResourcePath() }}/editor/ace.js" type="text/javascript" charset="utf-8"></script>
+<script src="{{ mavensmate.ui.getStaticResourcePath() }}/editor/mode-sql.js" type="text/javascript" charset="utf-8"></script>
+<style>
+    #editor {
+      position:absolute;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+  }
+
+    .gutter-mark {
+        background:red;
+    }
+
+    div#div-editor-wrapper {
+        width:100%;
+        height:20%;
+    }
+
+    .ace_gutter-tooltip {
+        background-image: linear-gradient(45deg,rgba(0,0,0,.025) 25%,transparent 25%,transparent 50%,rgba(0,0,0,.025) 50%,rgba(0,0,0,.025) 75%,transparent 75%,transparent);
+        background-size: 64px 64px;
+        background-color: #f4f6f9;
+    }
+</style>
+
+<div class="slds-grid">
+    <div class="slds-col">
+        <div id="div-editor-wrapper" style="position:relative;">
+            <div id="editor"></div>
+        </div>
+        <div id="results" class="slds-panel" style="display:none">
+            <div class="slds-panel__section slds-has-divider--bottom" >
+                <h3 class="slds-text-heading--medium">Query Results</h3>
+                (<span id="displayed-results"></span>/<span id="total-results"></span>) displayed  
+            </div>
+            <div class="slds-box slds-box--small slds-theme--shade slds-scrollable" >
+                <pre id="soql_result"></pre> 
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block buttons %}
+    <button class="slds-button slds-button--brand" onclick="executeSoql()" id="btnExecuteSoql">Execute</button>
+    {% include 'views/partials/cancel_button.html' %}
+{% endblock %}
+
+{% block body_js %}
+
+<script>
+
+var editor;
+
+$(function(){
+    editor = ace.edit('editor');
+    editor.setTheme('ace/theme/dawn');
+    var SqlMode = ace.require('ace/mode/sql').Mode;
+    editor.getSession().setMode(new SqlMode());
+    editor.getSession().setUseWrapMode(true);
+    editor.setFontSize(16);
+    editor.getSession().setTabSize(4);
+    editor.resize();
+    editor.focus();
+});
+
+function executeSoql() {
+    editor.getSession().clearAnnotations();
+    editor.setReadOnly(true);
+
+    var opts = {
+      showPageHeaderLoading: true,
+      ajax: {
+        type: 'POST',
+        url: "/app/soql",
+        data: JSON.stringify({
+          query: editor.getValue()
+        })
+      }
+    };
+
+    mavensmate.request(opts)
+      .then(function(response) {
+
+        if (response.complete) {
+          showToast('SOQL successfully executed', 'success');
+          var result = response.result;
+          var recordCount = result.totalSize;
+          var records = result.records;
+          var recordsReturned = records.length;
+
+          for(var i = 0; i < recordsReturned; i++){
+            removeAttribute(records[i]);
+          }
+
+          $('#displayed-results').text(recordsReturned);
+          $('#total-results').text(recordCount);
+          $('#soql_result').text(JSON.stringify(records, null, 2));
+          $('#results').show();
+        }
+      })
+      .catch(function(err) {
+        console.error('could not execute apex', err);
+        $('#results').hide();
+      })
+      .finally(function() {
+        hidePageHeaderLoading();
+        editor.setReadOnly(false);
+      });
+}
+
+//recursivly remove all attribute tags
+function removeAttribute(record){
+  for (var key in record) {
+    if(record.hasOwnProperty(key) && typeof record[key] === 'object'){
+      if(key == 'attributes'){
+        delete record[key];
+      }else{
+        removeAttribute(record[key]);
+      }
+    }
+  }
+}
+
+</script>
+{% endblock %}
