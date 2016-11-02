@@ -98,16 +98,6 @@
 
 				<div class="slds-form-element">
   				<div class="slds-form-element__control">
-  					<label class="slds-checkbox" for="run_tests">
-  					  <input type="checkbox" id="run_tests">
-  					  <span class="slds-checkbox--faux"></span>
-  					  <span class="slds-form-element__label">Run All Tests</span>
-  					</label>
-  				</div>
-				</div>
-
-				<div class="slds-form-element">
-  				<div class="slds-form-element__control">
   					<label class="slds-checkbox" for="ignoreWarnings">
   					  <input type="checkbox" id="ignoreWarnings">
   					  <span class="slds-checkbox--faux"></span>
@@ -116,29 +106,60 @@
   				</div>
 				</div>
 
-  		</fieldset>
+        {% if parseInt(mavensmate.ui.config.get('mm_api_version')) >= 34 %}
+        <div class="slds-form-element">
+          <label class="slds-form-element__label" for="test_level">Test Level</label>
+          <div class="slds-form-element__control">
+            <div class="slds-select_container">
+              <select id="test_level" class="slds-select" name="test_level" >
+                <option value="NoTestRun">No Tests</option>
+                <option value="RunSpecifiedTests">Specified Tests</option>
+                <option value="RunAllTestsInOrg">All Tests</option>
+                <option value="RunLocalTests">Local Tests</option>
+              </select>
+            </div>
+          </div>
+				</div>
 
-  	</div>
-  </div>
-  <div id="tab-default-3" class="slds-tabs--scoped__content slds-hide" role="tabpanel">
-    {% include 'views/partials/metadata_tree.html' %}
-  </div>
-  <div id="tab-default-4" class="slds-tabs--scoped__content slds-hide" role="tabpanel">
-    <div id="deploy-result">
-      <div class="slds-notify slds-notify--toast slds-theme--info" role="alert">
-        <span class="slds-assistive-text">Information</span>
-        <div class="slds-notify__content slds-grid">
-          <svg aria-hidden="true" class="slds-icon slds-icon--small slds-m-right--small slds-col slds-no-flex">
-            <use xlink:href="/app/static/lds/assets/icons/utility-sprite/svg/symbols.svg#info"></use>
-          </svg>
-          <div class="slds-col slds-align-middle">
-            <h2 class="slds-text-heading--small ">Deploy results will display here when available.</h2>
+        <div id="specify_tests_container" class="slds-tabs--scoped__content slds-hide">
+          {% include 'views/partials/test_select.html' %}
+        </div>
+
+        {% else %}
+        <div class="slds-form-element">
+  				<div class="slds-form-element__control">
+  					<label class="slds-checkbox" for="run_tests">
+  					  <input type="checkbox" id="run_tests">
+  					  <span class="slds-checkbox--faux"></span>
+  					  <span class="slds-form-element__label">Run All Tests</span>
+  					</label>
+  				</div>
+				</div>
+        {% endif %}
+
+        </fieldset>
+
+        </div>
+      </div>
+      <div id="tab-default-3" class="slds-tabs--scoped__content slds-hide" role="tabpanel">
+        {% include 'views/partials/metadata_tree.html' %}
+      </div>
+      <div id="tab-default-4" class="slds-tabs--scoped__content slds-hide" role="tabpanel">
+        <div id="deploy-result">
+          <div class="slds-notify slds-notify--toast slds-theme--info" role="alert">
+            <span class="slds-assistive-text">Information</span>
+            <div class="slds-notify__content slds-grid">
+              <svg aria-hidden="true" class="slds-icon slds-icon--small slds-m-right--small slds-col slds-no-flex">
+                <use xlink:href="/app/static/lds/assets/icons/utility-sprite/svg/symbols.svg#info"></use>
+              </svg>
+              <div class="slds-col slds-align-middle">
+                <h2 class="slds-text-heading--small ">Deploy results will display here when available.</h2>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-{% endblock %}
+    {% endblock %}
 
 
 {% block buttons %}
@@ -149,7 +170,7 @@
 
 {% block body_js %}
 <script type="text/javascript">
-	var metadataTree;
+  var metadataTree;
 
   $(function() {
     $('[data-aljs="tabs"]').tabs();
@@ -164,6 +185,14 @@
     $("#check_only").change(function() {
       var text = (this.checked)? 'Validate Deployment' : 'Deploy to Server';
       $("#btnDeploy").html(text);
+    });
+
+    $("#test_level").change(function() {
+      if(showTestSelect()){
+        $('#specify_tests_container').removeClass('slds-hide');
+      }else{
+        $('#specify_tests_container').addClass('slds-hide');
+      }
     });
 
     if (!{{ hasIndexedMetadata }}) {
@@ -191,9 +220,21 @@
 		return $("#check_only").is(":checked");
 	}
 
-	function isRunTests() {
+  function isRunTests() {
 		return $("#run_tests").is(":checked");
 	}
+
+	function getTestLevel() {
+		return $("#test_level").val();
+	}
+
+  function showTestSelect(){
+    return getTestLevel() == 'RunSpecifiedTests';
+  }
+
+  function getRunTests(){
+    return $('#specify_tests').text().split(',');
+  }
 
 	function isRollbackOnError() {
 		return $("#rollback").is(":checked");
@@ -237,6 +278,23 @@
 	}
 
 	function deploy() {
+    var deployOpts = {
+            rollbackOnError: isRollbackOnError(),
+            performRetrieve: true,
+            checkOnly: isValidateOnly(),
+            ignoreWarnings: isIgnoreWarnings()
+    };
+
+    if({{ mavensmate.ui.config.get('mm_api_version') }} >= 34){
+      deployOpts.testLevel = getTestLevel();
+      if(showTestSelect()){
+        deployOpts.runTests = getTestsToRun();
+      }
+    }else{
+      deployOpts.runAllTests = isRunTests();
+    }
+
+
     var opts = {
       showPageHeaderLoading: true,
       ajax: {
@@ -247,13 +305,7 @@
           package: metadataTree.getPackage(),
           deploymentName: $("#new_deployment_name").val(),
           ui: true,
-          deployOptions: {
-            rollbackOnError: isRollbackOnError(),
-            performRetrieve: true,
-            checkOnly: isValidateOnly(),
-            ignoreWarnings: isIgnoreWarnings(),
-            runAllTests: isRunTests()
-          }
+          deployOptions: deployOpts
         })
       }
     };

@@ -31,7 +31,7 @@ var mavensMateFile        = require('../file');
  * @param {Array} opts.sfdcClient - Sfdc Client instance
  * @param {Array} opts.targets - array of org connections
  * @param {Array} opts.checkOnly - whether this is a validate-only deployment
- * @param {Array} opts.runTests - whether to run tests during this deployment
+ * @param {Array.<String>} [opts.runTests] - A list of Apex tests to be run during deployment.
  * @param {Array} opts.rollbackOnError - whether to rollback when the deployment fails
  * @param {Array} opts.package - deployment payload
  * @param {Array} opts.newDeploymentName - the name of the deployment to be saved for future deploys
