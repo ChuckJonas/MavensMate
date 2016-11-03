@@ -27,7 +27,7 @@
           <tr class="slds-hint-parent">
             <td role="gridcell" class="slds-cell-shrink" data-label="Select row Cloudhub">
               <label class="slds-checkbox">
-                <input type="checkbox" class="chk-run-test-class" data-class-name={{cls}} />
+                <input type="checkbox" {%if className == cls %}checked{% endif %}  class="chk-run-test-class" data-class-name={{cls}} />
                 <span class="slds-checkbox--faux"></span>
                 <span class="slds-assistive-text">Select row {{cls}}</span>
               </label>
